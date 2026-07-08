@@ -66,6 +66,7 @@ impl StorableAppData {
 
 type Context<'a> = poise::Context<'a, Mutex<AppData>, Error>;
 
+/// Get the bots version
 #[poise::command(slash_command, prefix_command)]
 async fn version(ctx: Context<'_>) -> Result<(), Error> {
     let response = "v1.0";
@@ -73,6 +74,7 @@ async fn version(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Get relevant links
 #[poise::command(slash_command, prefix_command)]
 async fn links(ctx: Context<'_>) -> Result<(), Error> {
     let response = include_str!("../links_response.md");
@@ -80,6 +82,7 @@ async fn links(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Set the greeting channel
 #[poise::command(slash_command, prefix_command, required_permissions = "MANAGE_GUILD")]
 async fn set_general(
     ctx: Context<'_>,
@@ -98,6 +101,7 @@ async fn set_general(
     Ok(())
 }
 
+/// Set the role to give pro users
 #[poise::command(slash_command, prefix_command, required_permissions = "MANAGE_GUILD")]
 async fn set_pro_role(
     ctx: Context<'_>,
@@ -115,6 +119,7 @@ async fn set_pro_role(
     Ok(())
 }
 
+/// Set the free role to remove from users
 #[poise::command(slash_command, prefix_command, required_permissions = "MANAGE_GUILD")]
 async fn set_free_role(
     ctx: Context<'_>,
@@ -132,6 +137,7 @@ async fn set_free_role(
     Ok(())
 }
 
+/// Check status of your license key (and give you the pro role if valid)
 #[poise::command(slash_command, prefix_command)]
 async fn check_status(
     ctx: Context<'_>,
@@ -236,7 +242,7 @@ async fn event_handler(
             channel
                 .say(
                     ctx,
-                    format!("Welcome to the Sxitch Community {}!", new_member.mention()),
+                    format!("Welcome to the Sxitch Community {}! Run `/check_status` with you're license key to verify yourself if you're a pro user!", new_member.mention()),
                 )
                 .await
                 .ok();
