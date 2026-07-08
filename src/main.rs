@@ -73,6 +73,13 @@ async fn version(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+#[poise::command(slash_command, prefix_command)]
+async fn links(ctx: Context<'_>) -> Result<(), Error> {
+    let response = include_str!("../links_response.md");
+    ctx.say(response).await?;
+    Ok(())
+}
+
 #[poise::command(slash_command, prefix_command, required_permissions = "MANAGE_GUILD")]
 async fn set_general(
     ctx: Context<'_>,
