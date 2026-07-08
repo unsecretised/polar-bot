@@ -197,6 +197,7 @@ async fn main() {
                 set_free_role(),
                 set_pro_role(),
                 check_status(),
+                links(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
