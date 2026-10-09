@@ -465,9 +465,9 @@ async fn claim_discount(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Check status of your license key (and give you the pro role if valid)
+/// Verify your license key (removes the free role and gives you the Sxitch Pro role when valid)
 #[poise::command(slash_command, prefix_command)]
-async fn check_status(
+async fn verify_user(
     ctx: Context<'_>,
     #[description = "Your license key"] license_key: String,
 ) -> Result<(), Error> {
@@ -524,7 +524,7 @@ async fn check_status(
     ctx.send(
         CreateReply::default()
             .ephemeral(true)
-            .content("Verified successfully ✅"),
+            .content("Verified successfully ✅ You now have the Sxitch Pro role!"),
     )
     .await?;
     logging::log(
@@ -536,6 +536,84 @@ async fn check_status(
     )
     .await;
 
+    Ok(())
+}
+
+/// Manually give a member the pro role (and remove the free role)
+#[poise::command(slash_command, default_member_permissions = "MANAGE_GUILD")]
+async fn grant_pro(
+    ctx: Context<'_>,
+    #[description = "The member to upgrade"] member: serenity::Member,
+) -> Result<(), Error> {
+    let Some(pro_role) = ctx.data().db.get_setting_u64("pro_role") else {
+        ctx.send(
+            CreateReply::default()
+                .ephemeral(true)
+                .content("The pro role isn't configured yet - run `/setup` first."),
+        )
+        .await?;
+        return Ok(());
+    };
+
+    let pro_role = serenity::RoleId::new(pro_role);
+    member.add_role(ctx, pro_role).await?;
+    if let Some(free_role) = ctx.data().db.get_setting_u64("free_role") {
+        member.remove_role(ctx, serenity::RoleId::new(free_role)).await?;
+    }
+
+    ctx.send(
+        CreateReply::default()
+            .ephemeral(true)
+            .content(format!("{} was given {pro_role}.", member.mention())),
+    )
+    .await?;
+    logging::log(
+        ctx.http(),
+        &ctx.data().db,
+        "Pro role granted",
+        format!("{} upgraded {} to {pro_role}", ctx.author(), member.mention()),
+        COLOR_SUCCESS,
+    )
+    .await;
+    Ok(())
+}
+
+/// Manually give a member the free role (and remove the pro role)
+#[poise::command(slash_command, default_member_permissions = "MANAGE_GUILD")]
+async fn grant_free(
+    ctx: Context<'_>,
+    #[description = "The member to downgrade"] member: serenity::Member,
+) -> Result<(), Error> {
+    let Some(free_role) = ctx.data().db.get_setting_u64("free_role") else {
+        ctx.send(
+            CreateReply::default()
+                .ephemeral(true)
+                .content("The free role isn't configured yet - run `/setup` first."),
+        )
+        .await?;
+        return Ok(());
+    };
+
+    let free_role = serenity::RoleId::new(free_role);
+    member.add_role(ctx, free_role).await?;
+    if let Some(pro_role) = ctx.data().db.get_setting_u64("pro_role") {
+        member.remove_role(ctx, serenity::RoleId::new(pro_role)).await?;
+    }
+
+    ctx.send(
+        CreateReply::default()
+            .ephemeral(true)
+            .content(format!("{} was given {free_role}.", member.mention())),
+    )
+    .await?;
+    logging::log(
+        ctx.http(),
+        &ctx.data().db,
+        "Free role granted",
+        format!("{} gave {free_role} to {}", ctx.author(), member.mention()),
+        COLOR_INFO,
+    )
+    .await;
     Ok(())
 }
 
@@ -563,7 +641,9 @@ async fn main() {
             commands: vec![
                 version(),
                 setup(),
-                check_status(),
+                verify_user(),
+                grant_pro(),
+                grant_free(),
                 daily(),
                 balance(),
                 shop(),
@@ -611,20 +691,39 @@ async fn event_handler(
                     .say(
                         ctx,
                         format!(
-                            "Welcome to the Sxitch Community {}! Run `/check_status` with your license key to verify yourself if you're a pro user, and `/daily` to start earning coins!",
+                            "Welcome to the Sxitch Community {}! Run `/verify_user` with your license key to verify yourself and get the Sxitch Pro role, and `/daily` to start earning coins!",
                             new_member.mention()
                         ),
                     )
                     .await
                     .ok();
-                logging::log(
-                    &ctx.http,
-                    &data.db,
-                    "Member joined",
-                    format!("<@{user_id}> joined and was welcomed in {channel}"),
-                    COLOR_INFO,
-                )
-                .await;
+                let free_assigned = if let Some(free_role) = data.db.get_setting_u64("free_role") {
+                    new_member
+                        .add_role(ctx, serenity::RoleId::new(free_role))
+                        .await
+                        .is_ok()
+                } else {
+                    false
+                };
+                if free_assigned {
+                    logging::log(
+                        &ctx.http,
+                        &data.db,
+                        "Member joined",
+                        format!("<@{user_id}> joined, was greeted in {channel} and given the free role"),
+                        COLOR_INFO,
+                    )
+                    .await;
+                } else {
+                    logging::log(
+                        &ctx.http,
+                        &data.db,
+                        "Member joined",
+                        format!("<@{user_id}> joined and was greeted in {channel}"),
+                        COLOR_INFO,
+                    )
+                    .await;
+                }
             }
         }
         serenity::FullEvent::InteractionCreate {
